@@ -8,7 +8,7 @@ perceive the board as player 1
 import numpy as np
 import Backgammon
 
-def action(board_copy,dice,player,i):
+def action(board_copy,dice,player,i, **kwargs):
     # the champion to be
     # inputs are the board, the dice and which player is to move
     # outputs the chosen move accordingly to its policy

@@ -30,7 +30,7 @@ def pubeval_flip(board):
     board = board[:-1]
     return board
 
-def action(board, dice, oplayer, nRoll = 0):
+def action(board, dice, oplayer, nRoll = 0, **kwargs):
     flipped_player = -1
     if (flipped_player == oplayer):
         board = flipped_agent.flip_board(np.copy(board))
