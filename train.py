@@ -6,6 +6,9 @@ import pubeval
 import kotra
 import random_agent
 
+from tqdm import tqdm
+import cProfile
+
 def plot_perf(performance):
     plt.plot(performance)
     plt.show()
@@ -20,12 +23,12 @@ def evaluate(agent, evaluation_agent, n_eval, n_games):
     print("Win-rate after training for "+str(n_games)+" games: "+str(winrate)+"%" )
     return winrate
 
-def train(n_games=200_000, n_epochs=5000, n_eval=1000):
+def train(n_games=10, n_epochs=500, n_eval=100):
     agent = kotra
     evaluation_agent = pubeval
 
     winrates = []
-    for g in range(n_games):
+    for g in tqdm(range(n_games)):
         if g % n_epochs == 0 and g != 0:
             winrate = evaluate(agent, evaluation_agent, n_eval, n_games=g)
             winrates.append(winrate)
@@ -38,3 +41,4 @@ def train(n_games=200_000, n_epochs=5000, n_eval=1000):
 
 # ----- main -----
 train()
+# cProfile.run("train()")
