@@ -4,3 +4,4 @@ __pycache__
 flipped_board.py
 time_test.py
 .env/
+.vscode/
