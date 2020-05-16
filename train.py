@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-import Backgammon
+import backgammon
 import pubeval
 import kotra
 import random_agent
@@ -17,13 +17,13 @@ def plot_perf(performance):
 def evaluate(agent, evaluation_agent, n_eval, n_games):
     wins = 0
     for i in range(n_eval):
-        winner, board = Backgammon.play_a_game(agent, evaluation_agent)
+        winner, board = backgammon.play_a_game(agent, evaluation_agent)
         wins += int(winner==1)
     winrate = round(wins/n_eval*100,3)
     print("Win-rate after training for "+str(n_games)+" games: "+str(winrate)+"%" )
     return winrate
 
-def train(n_games=20_000, n_epochs=1_000, n_eval=100):
+def train(n_games=50_000, n_epochs=1000, n_eval=50):
     agent = kotra
     evaluation_agent = pubeval
 
@@ -33,7 +33,7 @@ def train(n_games=20_000, n_epochs=1_000, n_eval=100):
             winrate = evaluate(agent, evaluation_agent, n_eval, n_games=g)
             winrates.append(winrate)
 
-        winner, board = Backgammon.play_a_game(agent, agent, train=True, train_config={'g':g})
+        winner, board = backgammon.play_a_game(agent, agent, train=True, train_config={'g':g})
         agent.game_over_update(board, int(winner==1))
         agent.game_over_update(kotra.flip_board(board), int(winner==-1))
     

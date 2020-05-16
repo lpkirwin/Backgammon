@@ -6,7 +6,7 @@ see flipped_agent for an example of how to flip the board in order to always
 perceive the board as player 1
 """
 import numpy as np
-import Backgammon
+import backgammon
 
 def action(board_copy,dice,player,i, **kwargs):
     # the champion to be
@@ -14,7 +14,7 @@ def action(board_copy,dice,player,i, **kwargs):
     # outputs the chosen move accordingly to its policy
     
     # check out the legal moves available for the throw
-    possible_moves, possible_boards = Backgammon.legal_moves(board_copy, dice, player)
+    possible_moves = backgammon.legal_moves(board_copy, dice, player)
     
     # if there are no moves available
     if len(possible_moves) == 0: 

@@ -24,7 +24,7 @@ from tensorflow.keras import layers
 # https://github.com/cyoon1729/deep-Q-networks/blob/master/common/replay_buffers.py
 from basic_buffer import BasicBuffer 
 
-import Backgammon
+import backgammon
 
 
 # Model config and hyperparameters 
@@ -44,7 +44,8 @@ print('Model initialized with parameters:','\n'*2, config, '\n'*2)
 # Our deep Q-network
 DQN = keras.Sequential([
     layers.Dense(50, activation='relu', kernel_initializer='random_uniform', input_shape=(config.nS,)),
-    # layers.Dense(4, activation='relu', kernel_initializer='random_uniform'),
+    layers.Dense(50, activation='relu', kernel_initializer='random_uniform'),
+    layers.Dense(4, activation='relu', kernel_initializer='random_uniform'),
     layers.Dense(1, activation='sigmoid', kernel_initializer='random_uniform')
 ])
 DQN.compile(optimizer = 'Adam',loss = 'mse')
@@ -99,7 +100,7 @@ def game_over_update(board, reward):
     buffer = D if not bearing_off(board) else D_bearing_off
     buffer.push(S, None, reward, S, target, done=True)
     # print("game over update:")
-    # Backgammon.pretty_print(board)
+    # backgammon.pretty_print(board)
     # print("reward: ", reward)
     
 # ------------------------------- Action ---------------------------------
@@ -119,7 +120,15 @@ def action(board_copy,dice,player,i,train=False,train_config=None):
         board_copy = flip_board(board_copy)
         
     # check out the legal moves available for the throw
-    possible_moves, possible_boards = Backgammon.legal_moves(board_copy, dice, player=1)
+    possible_moves = backgammon.legal_moves(board_copy, dice, player=1)
+    possible_boards = list()
+    for m in possible_moves:
+        if len(m) == 1:
+            new_board = backgammon.update_board(board_copy, m[0], player=1)
+        elif len(m) == 2:
+            tmp_board = backgammon.update_board(board_copy, m[0], player=1)
+            new_board = backgammon.update_board(tmp_board, m[1], player=1)
+        possible_boards.append(new_board)
     
     # if there are no moves available, return an empty move
     if len(possible_moves) == 0: 
@@ -148,9 +157,9 @@ def action(board_copy,dice,player,i,train=False,train_config=None):
     # TODO: Fix the 16-piece bug (1 hour)
     # print("action:", action)
     # print("board:")
-    # Backgammon.pretty_print(board_copy)
+    # backgammon.pretty_print(board_copy)
     # print('"endgames":')
-    # [Backgammon.pretty_print(b) for b in possible_boards]
+    # [backgammon.pretty_print(b) for b in possible_boards]
 
     if train:
         # # number of games
@@ -182,8 +191,8 @@ def action(board_copy,dice,player,i,train=False,train_config=None):
             state_batch, action_batch, reward_batch, next_state_batch, target_batch, done_batch = D_bearing_off.sample(config.batch_size)
             DQN_bearing_off.train_on_batch(np.array(state_batch), np.array(target_batch))
         
-        # save model every 10_000 training moves
-        if counter % 10_000 == 0 and not counter in saved_models and counter != 0:
+        # save model every 100_000 training moves
+        if counter % 100_000 == 0 and not counter in saved_models and counter != 0:
             # save both networks
             filepath = "./kotra_weights/DQN_"+str(counter)
             print("saving weights in file:"+filepath)

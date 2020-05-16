@@ -5,7 +5,7 @@
 
 import ctypes
 import numpy as np
-import Backgammon
+import backgammon
 import flipped_agent
 from ctypes import cdll, c_float, c_int
 
@@ -39,7 +39,21 @@ def action(board, dice, oplayer, nRoll = 0, **kwargs):
         player = oplayer
     # check out the legal moves available for the throw
     race = c_int(israce(board))
-    possible_moves, possible_boards = Backgammon.legal_moves(board, dice, player)
+
+
+    # possible_moves, possible_boards = backgammon.legal_moves(board, dice, player)
+
+    # check out the legal moves available for the throw
+    possible_moves = backgammon.legal_moves(board, dice, player=1)
+    possible_boards = list()
+    for m in possible_moves:
+        if len(m) == 1:
+            new_board = backgammon.update_board(board, m[0], player=1)
+        elif len(m) == 2:
+            tmp_board = backgammon.update_board(board, m[0], player=1)
+            new_board = backgammon.update_board(tmp_board, m[1], player=1)
+        possible_boards.append(new_board)
+
     na = len(possible_moves)
     va = np.zeros(na)
     if (na == 0):
