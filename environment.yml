@@ -1,0 +1,9 @@
+name: backgammon
+channels:
+  - conda-forge
+dependencies:
+  - numpy
+  - matplotlib
+  - jupyter
+  - pip
+  - tensorflow-gpu
