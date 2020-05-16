@@ -33,9 +33,9 @@ class config:
     eps = 0.05
     lr = 0.05
     gamma = 0.99
-    C = 100
-    batch_size = 32
-    D_max = 1000
+    C = 500
+    batch_size = 256
+    D_max = 5000
 
 print('Model initialized with parameters:','\n'*2, config, '\n'*2)
 
@@ -176,19 +176,20 @@ def action(board_copy,dice,player,i,train=False,train_config=None):
 
         # train model from buffer
         if counter % config.batch_size == 0 and bearing_off_counter > config.batch_size:
+
             state_batch, action_batch, reward_batch, next_state_batch, target_batch, done_batch = D.sample(config.batch_size)
             DQN.train_on_batch(np.array(state_batch), np.array(target_batch))
             state_batch, action_batch, reward_batch, next_state_batch, target_batch, done_batch = D_bearing_off.sample(config.batch_size)
             DQN_bearing_off.train_on_batch(np.array(state_batch), np.array(target_batch))
         
-        # save model every 1000_000 training moves
-        if counter % 10_000_000 == 0 and not counter in saved_models and counter != 0:
+        # save model every 10_000 training moves
+        if counter % 10_000 == 0 and not counter in saved_models and counter != 0:
             # save both networks
             filepath = "./kotra_weights/DQN_"+str(counter)
             print("saving weights in file:"+filepath)
             DQN.save(filepath, overwrite=True, include_optimizer=True)
 
-            filepath += "bearing_off"
+            filepath += "_bearing_off"
             print("saving bearing-off-weights in file:"+filepath)
             DQN_bearing_off.save(filepath, overwrite=True, include_optimizer=True)
             saved_models.append(counter)
