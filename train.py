@@ -23,7 +23,7 @@ def evaluate(agent, evaluation_agent, n_eval, n_games):
     print("Win-rate after training for "+str(n_games)+" games: "+str(winrate)+"%" )
     return winrate
 
-def train(n_games=10, n_epochs=500, n_eval=100):
+def train(n_games=1000, n_epochs=100, n_eval=10):
     agent = kotra
     evaluation_agent = pubeval
 
