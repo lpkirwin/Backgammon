@@ -5,3 +5,4 @@ flipped_board.py
 time_test.py
 .env/
 .vscode/
+kotra_weights/
