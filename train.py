@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import Backgammon
 import pubeval
 import kotra
-import randomAgent
+import random_agent
 
 def plot_perf(performance):
     plt.plot(performance)

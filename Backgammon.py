@@ -10,7 +10,7 @@ so make sure your changes here won't affect his performance.
 """
 import numpy as np
 import matplotlib.pyplot as plt
-import randomAgent
+import random_agent
 # import sys
 import time
 import pubeval
@@ -289,7 +289,7 @@ def main():
         if g % nEpochs == 0:
             performance = log_status(g, wins, performance, nEpochs)
             wins = 0
-        winner = play_a_game(player1, player2, g, commentary=False)
+        winner, _ = play_a_game(player1, player2, g, commentary=False)
         winners[str(winner)] += 1
         wins += (winner==1)
     print("Out of", nGames, "games,")
