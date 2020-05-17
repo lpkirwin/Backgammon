@@ -376,7 +376,7 @@ def main():
         if g % nEpochs == 0:
             performance = log_status(g, wins, performance, nEpochs)
             wins = 0
-        winner, _ = play_a_game(player1, player2, g, commentary=False)
+        winner, _ = play_a_game(player1, player2)
         winners[str(winner)] += 1
         wins += winner == 1
     print("Out of", nGames, "games,")

@@ -1,6 +1,14 @@
 # Backgammon
 Backgammon interface for the 2nd and 3rd computational assignments in Computational Intelligence.
 
+    Board layout (from Tesauro)
+                                            1j | 1o 2o
+    13 14 15 16 17 18 | 19 20 21 22 23 24 | 25 | 26 27
+    12 11 10 09 08 07 | 06 05 04 03 02 01 | 00 
+                                            2j
+    1j, 2j = jail (for p1 and p2)
+    1o, 2o = off the board
+
 ## The board interpretation
 The game is set up in the **Backgammon.py** file. To play a game, simply run the program.
 The two players are defined as player 1 and player -1.
