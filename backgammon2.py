@@ -16,15 +16,15 @@ from numba.typed import List
 
 # Board layout (from Tesauro)
 #                                         1j | 1o 2o
-# 13 14 15 16 17 18 | 19 20 21 22 23 24 | 25 | 26 27
-# 12 11 10 09 08 07 | 06 05 04 03 02 01 | 00
+# 13 14 15 16 17 18 | 19 20 21 22 23 24 | 25 | 26 27 | 28 <- die counter
+# 12 11 10 09 08 07 | 06 05 04 03 02 01 | 00 
 #                                         2j
 # 1j, 2j = jail (for p1 and p2)
 # 1o, 2o = off the board
 
 
 def init_board():
-    board = np.zeros(28)
+    board = np.zeros(29)
     board[1] = -2
     board[12] = -5
     board[17] = -3
@@ -38,7 +38,7 @@ def init_board():
 
 STARTING_BOARD = init_board()
 
-FLIP_INDEX = np.array(list(range(25, -1, -1)) + [27, 26])
+FLIP_INDEX = np.array(list(range(25, -1, -1)) + [27, 26] + [28])
 
 
 @njit()
@@ -82,15 +82,15 @@ def check_for_error(board):
     return error_in_game
 
 
-def pretty_print(board):
-    string = str(
-        np.array2string(board[1:13])
-        + "\n"
-        + np.array2string(board[24:12:-1])
-        + "\n"
-        + np.array2string(board[25:29])
-    )
-    print("board: \n", string)
+# def pretty_print(board):
+#     string = str(
+#         np.array2string(board[1:13])
+#         + "\n"
+#         + np.array2string(board[24:12:-1])
+#         + "\n"
+#         + np.array2string(board[25:29])
+#     )
+#     print("board: \n", string)
 
 
 @njit()
@@ -106,19 +106,18 @@ def add_move_to_container(container, move):
 
 @njit()
 def empty_move():
-    return np.zeros(28)
+    return np.zeros(29)
 
 
 @njit()
-def convert_to_move(a, b, capture=False, board=None):
+def convert_to_move(a, b, capture=False):
     move = empty_move()
     move[a] -= 1
     move[b] += 1
     if capture:
-        # if (board + move)[b] != 0:
-        # print("whoops")
         move[b] += 1
         move[0] -= 1
+    move[28] = 1  # counter for number of dice used
     return move
 
 
@@ -141,12 +140,12 @@ def moves_for_one_die(board, die):
 
     # board = board.copy()
 
-    moves = make_move_container()
-    # moves = list()
+    # moves = make_move_container()
+    moves = list([empty_move()])
 
     is_game_over = game_over(board)
     if is_game_over:
-        add_move_to_container(moves, empty_move())
+        # add_move_to_container(moves, empty_move())
         return moves
 
     # if you're in jail
@@ -156,8 +155,9 @@ def moves_for_one_die(board, die):
         is_valid = valid_endpoint(board, b)
         is_captured = captured_endpoint(board, b)
         if is_valid:
-            move = convert_to_move(a, b, capture=is_captured, board=board)
-            add_move_to_container(moves, move)
+            move = convert_to_move(a, b, capture=is_captured)
+            # add_move_to_container(moves, move)
+            moves.append(move)
 
     # else not in jail
     else:
@@ -172,14 +172,16 @@ def moves_for_one_die(board, die):
                 a = die
                 b = 26
                 move = convert_to_move(a, b)
-                add_move_to_container(moves, move)
+                # add_move_to_container(moves, move)
+                moves.append(move)
 
             # if all pieces are past the die value
             elif die > max_position:
                 a = max_position
                 b = 26
                 move = convert_to_move(a, b)
-                add_move_to_container(moves, move)
+                # add_move_to_container(moves, move)
+                moves.append(move)
 
         # add all regular moves
         current_positions = np.where(board[0:25] > 0)[0]
@@ -188,13 +190,14 @@ def moves_for_one_die(board, die):
             is_valid = valid_endpoint(board, b)
             is_captured = captured_endpoint(board, b)
             if is_valid:
-                move = convert_to_move(a, b, capture=is_captured, board=board)
-                add_move_to_container(moves, move)
+                move = convert_to_move(a, b, capture=is_captured)
+                # add_move_to_container(moves, move)
+                moves.append(move)
 
-    # if you can't do anything, skip turn
-    move_count = len(moves)
-    if not move_count:
-        add_move_to_container(moves, empty_move())
+    # # if you can't do anything, skip turn
+    # move_count = len(moves)
+    # if not move_count:
+    #     add_move_to_container(moves, empty_move())
 
     return moves
 
@@ -206,29 +209,29 @@ def moves_for_two_dice(board, dice):
     # assert board[25] >= 0
     # assert board[26] >= 0
     # assert board[27] <= 0
+    # assert board[28] == 0
 
     moves = make_move_container()
     # moves = list()
+
     # doubles = dice[0] == dice[1]
     doubles = False
 
     if doubles:
 
-        pass
-
-        # first_moves = moves_for_one_die(board, dice[0])
-        # for m1 in first_moves:
-        #     tmp_board = board + m1
-        #     second_moves = moves_for_one_die(tmp_board, dice[0])
-        #     for m2 in second_moves:
-        #         tmp_board = board + m1 + m2
-        #         third_moves = moves_for_one_die(tmp_board, dice[0])
-        #         for m3 in third_moves:
-        #             tmp_board = board + m1 + m2 + m3
-        #             fourth_moves = moves_for_one_die(tmp_board, dice[0])
-        #             for m4 in fourth_moves:
-        #                 move = m1 + m2 + m3 + m4
-        #                 add_move_to_container(moves, move)
+        first_moves = moves_for_one_die(board, dice[0])
+        for m1 in first_moves:
+            tmp_board = board + m1
+            second_moves = moves_for_one_die(tmp_board, dice[0])
+            for m2 in second_moves:
+                tmp_board = board + m1 + m2
+                third_moves = moves_for_one_die(tmp_board, dice[0])
+                for m3 in third_moves:
+                    tmp_board = board + m1 + m2 + m3
+                    fourth_moves = moves_for_one_die(tmp_board, dice[0])
+                    for m4 in fourth_moves:
+                        move = m1 + m2 + m3 + m4
+                        add_move_to_container(moves, move)
 
     else:
 
@@ -256,27 +259,49 @@ def moves_for_two_dice(board, dice):
 
 @njit()
 def manual_concat(arrays):
+
     n_rows = len(arrays)
     n_cols = len(arrays[0])
     new_array = np.zeros(shape=(n_rows, n_cols))
-    for i, x in enumerate(arrays):
-        new_array[i, :] = x
-    return new_array
+
+    i = 0
+    for x in arrays:
+
+        skip = False
+
+        # # check for uniqueness of moves (a bit slow)
+        # for j in range(i):
+        #     if (x == new_array[j, :]).all():
+        #         skip = True
+
+        if not skip:
+            new_array[i, :] = x
+            i += 1
 
 
-def convert_to_array(moves, dice):
     # have to use all your moves if you're able to, so need
     # to filter out moves that don't use the maximum number
     # of dice
-    move_array = np.array(moves)
-    move_array = np.unique(move_array, axis=0)
-    if move_array.ndim > 1:
-        doubles = dice[0] == dice[1]
-        dice_available = 4 if doubles else 2
-        n_dice_used = (np.abs(move_array).sum(axis=1) / 2).clip(max=dice_available)
-        max_dice_used = np.max(n_dice_used)
-        move_array = move_array[n_dice_used == max_dice_used]
-    return move_array
+    max_dice_used = new_array[:, 28].max()
+    new_array = new_array[new_array[:, 28] == max_dice_used, :]
+    new_array[:, 28] = 0
+
+    return new_array
+
+
+# def process_array(move_array, dice):
+#     # have to use all your moves if you're able to, so need
+#     # to filter out moves that don't use the maximum number
+#     # of dice
+#     # move_array = np.unique(move_array, axis=0)
+#     if move_array.ndim > 1:
+#         doubles = dice[0] == dice[1]
+#         dice_available = 4 if doubles else 2
+#         n_dice_used = move_array[move_array]
+#         n_dice_used = (np.abs(move_array).sum(axis=1) / 2).clip(max=dice_available)
+#         max_dice_used = np.max(n_dice_used)
+#         move_array = move_array[n_dice_used == max_dice_used]
+#     return move_array
 
 
 class RandomPlayer(object):
@@ -303,8 +328,9 @@ def play_game(player1=None, player2=None, train=False):
         for _ in range(int(doubles) + 1):
 
             # moves = moves_for_two_dice(board, dice)
-            # move_array = convert_to_array(moves, dice)
             move_array = moves_for_two_dice(board, dice)
+            # move_array = process_array(move_array, dice)
+
             board_array = board + move_array
 
             if player == 1:
@@ -313,11 +339,6 @@ def play_game(player1=None, player2=None, train=False):
             else:
                 action = player2.action(board, board_array, train=train)
                 chosen_move = move_array[action]
-
-            # test_board = board + chosen_move
-            # is_error = check_for_error(test_board)
-            # if is_error:
-            #     print("whoops")
 
             board = board + chosen_move
 
