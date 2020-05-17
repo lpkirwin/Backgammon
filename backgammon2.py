@@ -1,23 +1,16 @@
-import numpy as np
 
-# import matplotlib.pyplot as plt
-# import random_agent
-
-# import sys
 import time
 
-# import pubeval
-# import kotra
-
-# import functools
-from tqdm import tqdm
+import numpy as np
 from numba import njit
-from numba.typed import List
+from tqdm import tqdm
+
+import pubeval2
 
 # Board layout (from Tesauro)
 #                                         1j | 1o 2o
 # 13 14 15 16 17 18 | 19 20 21 22 23 24 | 25 | 26 27 | 28 <- die counter
-# 12 11 10 09 08 07 | 06 05 04 03 02 01 | 00 
+# 12 11 10 09 08 07 | 06 05 04 03 02 01 | 00
 #                                         2j
 # 1j, 2j = jail (for p1 and p2)
 # 1o, 2o = off the board
@@ -53,7 +46,7 @@ assert (STARTING_BOARD == flipped_starting_board).all()
 dice_buffer = list()
 
 
-def roll_dice(buffer_size=1_000_000):
+def roll_dice(buffer_size=100_000):
     global dice_buffer
     try:
         return dice_buffer.pop()
@@ -64,33 +57,198 @@ def roll_dice(buffer_size=1_000_000):
 
 @njit()
 def game_over(board):
-    # returns True if the game is over
     return board[26] == 15 or board[27] == -15
 
 
 @njit()
+def game_over_array(board):
+    return (board[:, 26] == 15) | (board[:, 27] == -15)
+
+
+@njit()
 def check_for_error(board):
-
     error_in_game = False
-
     player_1_pieces = board[board > 0].sum()
     player_2_pieces = board[board < 0].sum()
-
     if (player_1_pieces != 15) or (player_2_pieces != -15):
         error_in_game = True
-
     return error_in_game
 
 
-# def pretty_print(board):
-#     string = str(
-#         np.array2string(board[1:13])
-#         + "\n"
-#         + np.array2string(board[24:12:-1])
-#         + "\n"
-#         + np.array2string(board[25:29])
-#     )
-#     print("board: \n", string)
+POSITION_NAMES = (
+    ["P2 jail"]
+    + list("ABCDEFGHIJKLMNOPQRSTUVWX")
+    + ["P1 jail", "P1 off", "P2 off", "Blank"]
+)
+
+
+def name_to_index(name, player):
+    if player == -1:
+        pos_names = list(np.array(POSITION_NAMES)[FLIP_INDEX])
+    else:
+        pos_names = POSITION_NAMES
+    if name in pos_names:
+        return pos_names.index(name)
+    else:
+        raise ValueError("Invalid name")
+
+
+def print_move(move):
+    for i, x in enumerate(move):
+        name = POSITION_NAMES[i]
+        if x > 0:
+            print(f"{name}: {''.join('+' for _ in range(int(x)))}")
+        if x < 0:
+            print(f"{name}: {''.join('-' for _ in range(abs(int(x))))}")
+
+
+def input_dice():
+    dice = input("Enter dice roll: ")
+    dice = make_dice(int(dice[0]), int(dice[1]))
+    return dice
+
+
+@njit()
+def make_dice(a, b):
+    # make dice that numba won't reject
+    return np.array([a, b])
+
+
+def print_dice(dice):
+    print("Dice:", " ".join(f"[{d}]" for d in dice))
+
+
+def print_player(player):
+    print("Player:", "1 (X)" if player == 1 else "2 (O)")
+
+
+def input_move(board, player, dice):
+
+    doubles = dice[0] == dice[1]
+    dice_list = list(dice.copy())
+    if doubles:
+        dice_list = dice_list * 2
+    n_dice = len(dice_list)
+    i = 1
+
+    print_board(board, player)
+    print_player(player)
+    print_dice(dice_list)
+
+    while dice_list:
+
+        legal_moves = list()
+        for die in dice_list:
+            legal_moves.extend(moves_for_one_die(board, die))
+
+        if len(legal_moves) == 1:
+            print("No legal moves?")
+
+        move_string = input(f">> Enter move {i}: ")
+
+        # if no input, ask again
+        if not move_string:
+            continue
+
+        # convention for picking random move (possibly)
+        if move_string == " ":
+            if len(dice_list) != n_dice:
+                print("Already started move, too late for random")
+            print("Making random moves")
+            for _ in range(int(doubles) + 1):
+                move_array = moves_for_two_dice(board, dice)
+                board_array = board + move_array
+                random_player = RandomPlayer()
+                action = random_player.action(board, board_array)
+                chosen_move = move_array[action]
+                board = board + chosen_move
+            return board
+
+        # if in jail then only input number, if bearing off
+        # then only input position
+        if len(move_string) == 1:
+            try:
+                a = 25
+                delta = int(move_string)
+                b = a - delta
+            except ValueError:
+                try:
+                    a = name_to_index(move_string.upper(), player)
+                    b = 26
+                except Exception:
+                    is_valid = False
+
+        elif len(move_string) > 1:
+            try:
+                a = name_to_index(move_string[0].upper(), player)
+                delta = int(move_string[1])
+                b = a - delta
+            except Exception:
+                is_valid = False
+
+        try:
+            is_captured = captured_endpoint(board, b)
+            move = convert_to_move(a, b, capture=is_captured)
+            is_valid = any([(move == m).all() for m in legal_moves])
+        except Exception:
+            is_valid = False
+
+        if is_valid:
+            board = board + move
+            dice_list.pop(dice_list.index(delta))
+            i += 1
+
+            if is_captured:
+                print("Nice capture :)")
+
+            print_board(board, player)
+            print_player(player)
+            print_dice(dice_list)
+
+        else:
+            print("Invalid move!")
+
+    print("Done, thanks!")
+    return board
+
+
+def print_board(board, player):
+
+    # always show from player 1's perspective
+    if player == -1:
+        board = flip_board(board)
+
+    def p(x, row):
+        x = board[x]
+        if abs(x) > row:
+            p = "X" if x > 0 else "O"
+        else:
+            p = "_"
+        return p
+
+    out = f"""
+    P2 off: {"".join("O" for _ in range(int(abs(board[27]))))}
+    P2 jail: {"".join("O" for _ in range(int(abs(board[0]))))}
+
+      M N O P Q R | S T U V W X
+    | {p(13, 0)} {p(14, 0)} {p(15, 0)} {p(16, 0)} {p(17, 0)} {p(18, 0)} | {p(19, 0)} {p(20, 0)} {p(21, 0)} {p(22, 0)} {p(23, 0)} {p(24, 0)} |
+    | {p(13, 1)} {p(14, 1)} {p(15, 1)} {p(16, 1)} {p(17, 1)} {p(18, 1)} | {p(19, 1)} {p(20, 1)} {p(21, 1)} {p(22, 1)} {p(23, 1)} {p(24, 1)} |
+    | {p(13, 2)} {p(14, 2)} {p(15, 2)} {p(16, 2)} {p(17, 2)} {p(18, 2)} | {p(19, 2)} {p(20, 2)} {p(21, 2)} {p(22, 2)} {p(23, 2)} {p(24, 2)} |
+    | {p(13, 3)} {p(14, 3)} {p(15, 3)} {p(16, 3)} {p(17, 3)} {p(18, 3)} | {p(19, 3)} {p(20, 3)} {p(21, 3)} {p(22, 3)} {p(23, 3)} {p(24, 3)} |
+    | {p(13, 4)} {p(14, 4)} {p(15, 4)} {p(16, 4)} {p(17, 4)} {p(18, 4)} | {p(19, 4)} {p(20, 4)} {p(21, 4)} {p(22, 4)} {p(23, 4)} {p(24, 4)} |
+    |             |             |
+    | {p(12, 4)} {p(11, 4)} {p(10, 4)} {p( 9, 4)} {p( 8, 4)} {p( 7, 4)} | {p( 6, 4)} {p( 5, 4)} {p( 4, 4)} {p( 3, 4)} {p( 2, 4)} {p( 1, 4)} |
+    | {p(12, 3)} {p(11, 3)} {p(10, 3)} {p( 9, 3)} {p( 8, 3)} {p( 7, 3)} | {p( 6, 3)} {p( 5, 3)} {p( 4, 3)} {p( 3, 3)} {p( 2, 3)} {p( 1, 3)} |
+    | {p(12, 2)} {p(11, 2)} {p(10, 2)} {p( 9, 2)} {p( 8, 2)} {p( 7, 2)} | {p( 6, 2)} {p( 5, 2)} {p( 4, 2)} {p( 3, 2)} {p( 2, 2)} {p( 1, 2)} |
+    | {p(12, 1)} {p(11, 1)} {p(10, 1)} {p( 9, 1)} {p( 8, 1)} {p( 7, 1)} | {p( 6, 1)} {p( 5, 1)} {p( 4, 1)} {p( 3, 1)} {p( 2, 1)} {p( 1, 1)} |
+    | {p(12, 0)} {p(11, 0)} {p(10, 0)} {p( 9, 0)} {p( 8, 0)} {p( 7, 0)} | {p( 6, 0)} {p( 5, 0)} {p( 4, 0)} {p( 3, 0)} {p( 2, 0)} {p( 1, 0)} |
+      L K J I H G   F E D C B A
+
+    P1 jail: {"".join("X" for _ in range(int(board[25])))}
+    P1 off: {"".join("X" for _ in range(int(board[26])))}
+    """
+
+    print(out)
 
 
 @njit()
@@ -101,7 +259,6 @@ def make_move_container():
 @njit()
 def add_move_to_container(container, move):
     container.append(move)
-    # container.union([move])
 
 
 @njit()
@@ -131,6 +288,13 @@ def valid_endpoint(board, x):
 
 
 @njit()
+def valid_startpoint(board, x):
+    if board[x] > 0:
+        return True
+    return False
+
+
+@njit()
 def captured_endpoint(board, x):
     return board[x] == -1
 
@@ -138,14 +302,10 @@ def captured_endpoint(board, x):
 @njit()
 def moves_for_one_die(board, die):
 
-    # board = board.copy()
-
-    # moves = make_move_container()
-    moves = list([empty_move()])
+    moves = make_move_container()
 
     is_game_over = game_over(board)
     if is_game_over:
-        # add_move_to_container(moves, empty_move())
         return moves
 
     # if you're in jail
@@ -156,8 +316,7 @@ def moves_for_one_die(board, die):
         is_captured = captured_endpoint(board, b)
         if is_valid:
             move = convert_to_move(a, b, capture=is_captured)
-            # add_move_to_container(moves, move)
-            moves.append(move)
+            add_move_to_container(moves, move)
 
     # else not in jail
     else:
@@ -172,16 +331,14 @@ def moves_for_one_die(board, die):
                 a = die
                 b = 26
                 move = convert_to_move(a, b)
-                # add_move_to_container(moves, move)
-                moves.append(move)
+                add_move_to_container(moves, move)
 
             # if all pieces are past the die value
             elif die > max_position:
                 a = max_position
                 b = 26
                 move = convert_to_move(a, b)
-                # add_move_to_container(moves, move)
-                moves.append(move)
+                add_move_to_container(moves, move)
 
         # add all regular moves
         current_positions = np.where(board[0:25] > 0)[0]
@@ -191,13 +348,7 @@ def moves_for_one_die(board, die):
             is_captured = captured_endpoint(board, b)
             if is_valid:
                 move = convert_to_move(a, b, capture=is_captured)
-                # add_move_to_container(moves, move)
-                moves.append(move)
-
-    # # if you can't do anything, skip turn
-    # move_count = len(moves)
-    # if not move_count:
-    #     add_move_to_container(moves, empty_move())
+                add_move_to_container(moves, move)
 
     return moves
 
@@ -205,6 +356,7 @@ def moves_for_one_die(board, die):
 @njit()
 def moves_for_two_dice(board, dice):
 
+    # # integrity checks
     # assert board[0] <= 0
     # assert board[25] >= 0
     # assert board[26] >= 0
@@ -212,13 +364,13 @@ def moves_for_two_dice(board, dice):
     # assert board[28] == 0
 
     moves = make_move_container()
-    # moves = list()
 
     # doubles = dice[0] == dice[1]
     doubles = False
 
     if doubles:
 
+        # this seems to be slow :(
         first_moves = moves_for_one_die(board, dice[0])
         for m1 in first_moves:
             tmp_board = board + m1
@@ -278,7 +430,6 @@ def manual_concat(arrays):
             new_array[i, :] = x
             i += 1
 
-
     # have to use all your moves if you're able to, so need
     # to filter out moves that don't use the maximum number
     # of dice
@@ -289,19 +440,13 @@ def manual_concat(arrays):
     return new_array
 
 
-# def process_array(move_array, dice):
-#     # have to use all your moves if you're able to, so need
-#     # to filter out moves that don't use the maximum number
-#     # of dice
-#     # move_array = np.unique(move_array, axis=0)
-#     if move_array.ndim > 1:
-#         doubles = dice[0] == dice[1]
-#         dice_available = 4 if doubles else 2
-#         n_dice_used = move_array[move_array]
-#         n_dice_used = (np.abs(move_array).sum(axis=1) / 2).clip(max=dice_available)
-#         max_dice_used = np.max(n_dice_used)
-#         move_array = move_array[n_dice_used == max_dice_used]
-#     return move_array
+@njit()
+def is_race(board):
+    p1_pos = np.where(board[0:26] > 0)[0]
+    p2_pos = np.where(board[0:26] < 0)[0]
+    if p1_pos[-1] < p2_pos[0]:
+        return True
+    return False
 
 
 class RandomPlayer(object):
@@ -323,24 +468,21 @@ def play_game(player1=None, player2=None, train=False):
     while True:
 
         dice = roll_dice()
+
         doubles = dice[0] == dice[1]
+        # doubles = False
 
         for _ in range(int(doubles) + 1):
 
-            # moves = moves_for_two_dice(board, dice)
             move_array = moves_for_two_dice(board, dice)
-            # move_array = process_array(move_array, dice)
-
             board_array = board + move_array
 
             if player == 1:
                 action = player1.action(board, board_array, train=train)
-                chosen_move = move_array[action]
             else:
                 action = player2.action(board, board_array, train=train)
-                chosen_move = move_array[action]
 
-            board = board + chosen_move
+            board = board_array[action].copy()
 
             # check exit conditions
             # game_has_error = check_for_error(board)
@@ -348,7 +490,8 @@ def play_game(player1=None, player2=None, train=False):
             #     raise ValueError("Game in error state")
             is_game_over = game_over(board)
             if is_game_over:
-                return player, board
+                winner = player
+                return winner
 
         # prep for next turn
         player *= -1
@@ -358,57 +501,57 @@ def play_game(player1=None, player2=None, train=False):
         # if turn % 1000 == 0:
         #     print("check in")
 
-    # return the winner
-    return -1 * player, board
+
+# def plot_perf(performance):
+#     plt.plot(performance)
+#     plt.show()
+#     return
 
 
-def plot_perf(performance):
-    plt.plot(performance)
-    plt.show()
-    return
-
-
-def log_status(g, wins, performance, nEpochs):
-    if g == 0:
-        return performance
-    print("game number", g)
-    win_rate = wins / nEpochs
-    print("win rate:", win_rate)
-    performance.append(win_rate)
-    return performance
+# def log_status(g, wins, performance, nEpochs):
+#     if g == 0:
+#         return performance
+#     print("game number", g)
+#     win_rate = wins / nEpochs
+#     print("win rate:", win_rate)
+#     performance.append(win_rate)
+#     return performance
 
 
 def main():
-    startTime = time.time()
+
+    n_games = 5_000
+    n_epochs = 1_000
+
+    player1 = pubeval2
+    player2 = pubeval2
+
+    start_time = time.time()
+
     winners = {}
-    winners["1"] = 0
-    winners["-1"] = 0
-    # Collecting stats of the games
-    nGames = 5000  # how many games?
-    performance = list()
-    player1 = None
-    player2 = None
-    wins = 0
-    nEpochs = 1_000
-    print("Playing " + str(nGames) + " between" + str(player1) + " and " + str(player2))
-    for g in tqdm(range(nGames)):
-        if g % nEpochs == 0:
-            performance = log_status(g, wins, performance, nEpochs)
-            wins = 0
-        winner, _ = play_game(player1, player2)
-        winners[str(winner)] += 1
-        wins += winner == 1
-    print("Out of", nGames, "games,")
-    print("player", 1, "won", winners["1"], "times and")
-    print("player", -1, "won", winners["-1"], "times")
-    runTime = time.time() - startTime
-    print("runTime:", runTime)
-    print("average time:", runTime / nGames)
+    winners[1] = 0
+    winners[-1] = 0
+
+    print("Playing " + str(n_games) + " between " + str(player1) + " and " + str(player2))
+
+    for g in tqdm(range(n_games)):
+        if g % n_epochs == 0:
+            print(winners)
+        winner = play_game(player1, player2)
+        winners[winner] += 1
+    
+    print("Winners:", winners)
+    print("Player 1 win rate:", winners[1] / sum(winners.values()))
+
+    run_time = time.time() - start_time
+    print("Run time:", run_time)
+    print("Average time:", run_time / n_games)
+
     # plot_perf(performance)
 
 
 if __name__ == "__main__":
-    import cProfile
-
+    
+    # import cProfile
     # cProfile.run("main()")
     main()
