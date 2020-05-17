@@ -363,7 +363,7 @@ def main():
     winners["1"] = 0
     winners["-1"] = 0
     # Collecting stats of the games
-    nGames = 500  # how many games?
+    nGames = 5000  # how many games?
     performance = list()
     player1 = None
     player2 = None
