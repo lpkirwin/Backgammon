@@ -7,18 +7,10 @@ import backgammon2
 from replay_buffer import ReplayBuffer
 
 
-class config:
-    input_shape = 29
-    epsilon = 0.01
-    learning_rate = 0.1
-    gamma = 0.99
-    batch_size = 256
-    train_model_steps = 512
-    update_target_steps = 2048
-    save_model_steps = 262144
-    saved_model = None
-    saved_model = "./teddy_weights/"
-
+# 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192,
+# 16384, 32768, 65536, 131072, 262144, 524288, 1048576, 2097152,
+# 4194304, 8388608, 16777216, 33554432, 67108864, 134217728,
+# 268435456, 536870912, 1073741824, 2147483648
 
 CONFIG = {
     "input_shape": 29,
@@ -27,8 +19,9 @@ CONFIG = {
     "gamma": 0.99,
     "batch_size": 256,
     "train_model_steps": 512,
-    "update_target_steps": 2048,
+    "update_target_steps": 32768,
     "save_model_steps": 262144,
+    "saved_model_dir": "teddy_weights2",
     "saved_model": None,
     # "saved_model": "./teddy_weights/...",
     "saved_model_race": None,
@@ -49,12 +42,7 @@ else:
                 kernel_initializer="random_uniform",
                 input_shape=(CONFIG["input_shape"],),
             ),
-            layers.Dense(
-                50,
-                activation="relu",
-                kernel_initializer="random_uniform",
-                input_shape=(CONFIG["input_shape"],),
-            ),
+            layers.Dense(50, activation="relu", kernel_initializer="random_uniform",),
             layers.Dense(4, activation="relu", kernel_initializer="random_uniform"),
             layers.Dense(1, activation="sigmoid", kernel_initializer="random_uniform"),
         ]
@@ -79,8 +67,8 @@ DQN_race_target = tf.keras.models.clone_model(DQN)
 DQN_race_target.compile(optimizer="Adam", loss="mse")
 
 # replay buffer to reduce correlation
-B = ReplayBuffer(obs_dim=29, size=512, batch_size=64)
-B_race = ReplayBuffer(obs_dim=29, size=512, batch_size=64)
+B = ReplayBuffer(obs_dim=29, size=2048, batch_size=256)
+B_race = ReplayBuffer(obs_dim=29, size=2048, batch_size=256)
 
 # for tracking progress
 counter = 0
@@ -136,8 +124,7 @@ def action(board, board_array, train=False, **kwargs):
         next_board = board_array[action]
         buffer.store(obs=board, next_obs=next_board)
 
-        # train model from buffer
-        if cnt % CONFIG["train_model_steps"] == 0:
+        if (cnt % CONFIG["train_model_steps"] == 0) and (cnt != 0):
             # print(f"Training model - {cnt}")
 
             batch = buffer.sample_batch()
@@ -159,8 +146,7 @@ def action(board, board_array, train=False, **kwargs):
 
         if cnt % CONFIG["save_model_steps"] == 0:
             print(f"Saving model - {cnt}")
-            # save both networks
-            filepath = f"./teddy_weights/{model_name}_{str(cnt)}"
+            filepath = f"./{CONFIG['saved_model_dir']}/{model_name}_{str(cnt)}"
             print("saving weights in file:", filepath)
             model.save(filepath, overwrite=True, include_optimizer=True)
 

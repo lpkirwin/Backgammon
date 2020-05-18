@@ -33,7 +33,7 @@ def train(n_games=200_000, n_epochs=2_000, n_eval=1_000):
     win_rates = []
     for g in tqdm(range(n_games)):
 
-        if g % n_epochs == 0 and g != 0:
+        if (g % n_epochs == 0) and (g != 0):
             win_rate = evaluate(agent, evaluation_agent, n_eval, n_games=g)
             win_rates.append(win_rate)
 
