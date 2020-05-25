@@ -6,5 +6,4 @@ time_test.py
 .env/
 .vscode/
 kotra_weights/
-teddy_weights/
-teddy_weights2/
+teddy_models/
