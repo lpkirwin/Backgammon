@@ -15,7 +15,7 @@ import random_agent
 # import sys
 import time
 
-# import pubeval
+import pubeval
 # import kotra
 
 # import functools
@@ -368,7 +368,7 @@ def main():
     nGames = 5000  # how many games?
     performance = list()
     player1 = random_agent
-    player2 = random_agent
+    player2 = pubeval
     wins = 0
     nEpochs = 1_000
     print("Playing " + str(nGames) + " between" + str(player1) + " and " + str(player2))

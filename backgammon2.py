@@ -18,7 +18,7 @@ import teddy
 
 
 def init_board():
-    board = np.zeros(29)
+    board = np.zeros(29, dtype=np.float32)
     board[1] = -2
     board[12] = -5
     board[17] = -3
@@ -32,7 +32,7 @@ def init_board():
 
 STARTING_BOARD = init_board()
 
-FLIP_INDEX = np.array(list(range(25, -1, -1)) + [27, 26] + [28])
+FLIP_INDEX = np.array(list(range(25, -1, -1)) + [27, 26] + [28], dtype=np.int32)
 
 
 @njit()
@@ -106,7 +106,7 @@ def check_for_error(board):
 POSITION_NAMES = (
     ["P2 jail"]
     + list("ABCDEFGHIJKLMNOPQRSTUVWX")
-    + ["P1 jail", "P1 off", "P2 off", "Blank"]
+    + ["P1 jail", "P1 off", "P2 off", "_move_count"]
 )
 
 
@@ -133,15 +133,21 @@ def print_move(move, player):
 
 
 def input_dice():
-    dice = input("Enter dice roll: ")
-    dice = make_dice(int(dice[0]), int(dice[1]))
+    dice = None
+    while dice is None:
+        try:
+            dice = input("Enter dice roll: ")
+            dice = make_dice(int(dice[0]), int(dice[1]))
+        except Exception as e:
+            print("Invalid dice!", e)
+            dice = None
     return dice
 
 
 @njit()
 def make_dice(a, b):
     # make dice that numba won't reject
-    return np.array([a, b])
+    return np.array([a, b], dtype=np.int32)
 
 
 def print_dice(dice):
@@ -235,6 +241,7 @@ def input_move(board, player, dice):
 
         if is_valid:
             board = board + move
+            board = reset_move_counter(board)
             dice_list.pop(dice_list.index(delta))
             i += 1
 
@@ -303,7 +310,7 @@ def add_move_to_container(container, move):
 
 @njit()
 def empty_move():
-    return np.zeros(29)
+    return np.zeros(29, dtype=np.float32)
 
 
 @njit()
@@ -455,7 +462,7 @@ def manual_concat(arrays, make_unique=False):
 
     n_cols = len(arrays[0])
     n_rows = len(arrays)
-    new_array = np.zeros(shape=(n_rows, n_cols))
+    new_array = np.zeros(shape=(n_rows, n_cols), dtype=np.float32)
 
     i = 0
 
@@ -499,16 +506,16 @@ def is_race(board):
 
 @njit()
 def is_race_array(board_array):
-    return np.array([is_race(b) for b in board_array])
+    return np.array([is_race(b) for b in board_array], dtype=np.float32)
 
 
-POSITIONS = np.array(range(1, 25))
+POSITIONS = np.array(range(1, 25), dtype=np.float32)
 
 
 @njit()
 def board_array_to_state_array(board_array):
 
-    state_array = np.zeros(shape=(len(board_array), 79))
+    state_array = np.zeros(shape=(len(board_array), 79), dtype=np.float32)
 
     # for convenience, aliases for 'main board' and
     # a vector of main board positions
@@ -612,11 +619,11 @@ def play_game(player1=None, player2=None, train=False, fast=True, **kwargs):
 
 def main():
 
-    n_games = 30
+    n_games = 500
     n_epochs = 1_000
 
     # player1 = pubeval2.PubEval()
-    player1 = teddy.AgentTeddy(saved_model="teddy_models/teddy_v3", model_name="~")
+    player1 = teddy.AgentTeddy(saved_model="38_thirtyeight", model_name="~")
     player2 = pubeval2.PubEval()
 
     start_time = time.time()

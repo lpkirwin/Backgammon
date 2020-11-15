@@ -8,7 +8,7 @@ import random
 # https://nbviewer.jupyter.org/github/Curt-Park/rainbow-is-all-you-need/blob/master/08.rainbow.ipynb
 
 
-class ReplayBuffer:
+class NStepBuffer:
     """A simple numpy replay buffer."""
 
     def __init__(
@@ -53,7 +53,7 @@ class ReplayBuffer:
             # make a n-step transition
             rew, next_obs, done = self._get_n_step_info(self.n_step_buffer, self.gamma)
             obs, act = self.n_step_buffer[0][:2]
-            
+
             # get reward from n_step, but use immediate next step
             next_obs = self.n_step_buffer[0][-2]
 
@@ -67,18 +67,18 @@ class ReplayBuffer:
 
         return self.n_step_buffer[0]
 
-    # def sample_batch(self) -> Dict[str, np.ndarray]:
-    #     idxs = np.random.choice(self.size, size=self.batch_size, replace=False)
+    def sample_batch(self, **kwargs) -> Dict[str, np.ndarray]:
+        idxs = np.random.choice(self.size, size=self.batch_size, replace=False)
 
-    #     return dict(
-    #         obs=self.obs_buf[idxs],
-    #         next_obs=self.next_obs_buf[idxs],
-    #         acts=self.acts_buf[idxs],
-    #         rews=self.rews_buf[idxs],
-    #         done=self.done_buf[idxs],
-    #         # for N-step Learning
-    #         indices=indices,
-    #     )
+        return dict(
+            obs=self.obs_buf[idxs],
+            next_obs=self.next_obs_buf[idxs],
+            acts=self.acts_buf[idxs],
+            rews=self.rews_buf[idxs],
+            done=self.done_buf[idxs],
+            # for N-step Learning
+            # indices=indices,
+        )
 
     def sample_batch_from_idxs(self, idxs: np.ndarray) -> Dict[str, np.ndarray]:
         # for N-step Learning
@@ -110,7 +110,7 @@ class ReplayBuffer:
         return self.size
 
 
-class PrioritizedReplayBuffer(ReplayBuffer):
+class PrioritizedReplayBuffer(NStepBuffer):
     """Prioritized Replay buffer.
 
     Attributes:
@@ -225,3 +225,68 @@ class PrioritizedReplayBuffer(ReplayBuffer):
         weight = weight / max_weight
 
         return weight
+
+
+class GameBuffer:
+    """Returns an entire game at once"""
+
+    def __init__(
+        self, obs_dim: int, max_games: int = 32, batch_size: int = 2,
+    ):
+        size = max_games * 500
+        self.obs_buf = np.zeros([size, obs_dim], dtype=np.float32)
+        self.next_obs_buf = np.zeros([size, obs_dim], dtype=np.float32)
+        self.acts_buf = np.zeros([size], dtype=np.float32)
+        self.rews_buf = np.zeros([size], dtype=np.float32)
+        self.done_buf = np.zeros(size, dtype=np.float32)
+        self.max_size, self.batch_size = size, batch_size
+        self.ptr, self.n_games, = 0, 0
+        self.game_start_ptr = 0
+
+        # for storing games
+        self.max_games = max_games
+        self.game_buffer = deque(maxlen=max_games)
+
+    def store(
+        self,
+        obs: np.ndarray,
+        act: np.ndarray,
+        rew: float,
+        next_obs: np.ndarray,
+        done: bool,
+    ) -> Tuple[np.ndarray, np.ndarray, float, np.ndarray, bool]:
+
+        self.obs_buf[self.ptr] = obs
+        self.next_obs_buf[self.ptr] = next_obs
+        self.acts_buf[self.ptr] = act
+        self.rews_buf[self.ptr] = rew
+        self.done_buf[self.ptr] = done
+        self.ptr = (self.ptr + 1) % self.max_size
+
+        if done:
+            self.store_game()
+
+    def store_game(self):
+        self.game_buffer.append((self.game_start_ptr, self.ptr))
+        self.game_start_ptr = self.ptr
+
+    def sample_batch(self, **kwargs) -> Dict[str, np.ndarray]:
+        game_idxs = np.random.choice(
+            len(self.game_buffer), size=self.batch_size, replace=False
+        )
+
+        idxs = list()
+        for g in game_idxs:
+            start, end = self.game_buffer[g]
+            idxs.extend(range(start, end))
+
+        return dict(
+            obs=self.obs_buf[idxs],
+            next_obs=self.next_obs_buf[idxs],
+            acts=self.acts_buf[idxs],
+            rews=self.rews_buf[idxs],
+            done=self.done_buf[idxs],
+        )
+
+    def __len__(self) -> int:
+        return len(self.game_buffer)

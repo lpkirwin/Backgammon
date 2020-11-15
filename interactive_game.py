@@ -6,19 +6,24 @@ import time
 
 board = bkg.STARTING_BOARD
 
-player = 1
+player = -1
 
-get_dice = bkg.roll_dice
-# get_dice = bkg.input_dice
+# get_dice = bkg.roll_dice
+get_dice = bkg.input_dice
 
-# opp = teddy.AgentTeddy()
-opp = pubeval2.PubEval()
+opp = teddy.AgentTeddy(saved_model="cottage_current_best copy 2", name="interactive")
+print(opp.config)
+# opp = pubeval2.PubEval()
+
+print()
+print()
+player = int(input("who goes first? player: "))
 
 while True:
 
     dice = get_dice()
 
-    if player == 1:
+    if player == -1:
         board = bkg.input_move(board, player, dice)
 
     else:
@@ -28,16 +33,20 @@ while True:
         print(f"{opp} is planning their move...")
         time.sleep(1)
 
-        move_array = bkg.moves_for_two_dice(board, dice[0], dice[1], fast=False)
+        move_array = bkg.moves_for_two_dice(
+            board, dice[0], dice[1], all_doubles=True, make_unique=True
+        )
         board_array = board + move_array
-        action = opp.action(board, board_array)
+        action = opp.action(board, board_array, print_value=True)
         move = move_array[action]
         board = board_array[action].copy()
 
         print("Chosen move:")
         bkg.print_move(move, player)
         print("Done.")
-        time.sleep(3)
+        print("New board:")
+        bkg.print_board(board, player)
+        time.sleep(0.5)
 
     is_game_over = bkg.game_over(board)
     if is_game_over:
